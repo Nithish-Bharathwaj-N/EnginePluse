@@ -5,6 +5,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 
 interface UnityDigitalTwinViewportProps {
+  modelUrl?: string;
   viewMode: 'NORMAL' | 'EXPLODED' | 'THERMAL' | 'XRAY' | 'STRESS';
   onViewModeChange: (mode: string) => void;
   selectedSubsystem: string | null;
@@ -103,6 +104,7 @@ const getHealthColor = (health: number) => {
 };
 
 export default function UnityDigitalTwinViewport({
+  modelUrl = '/models/ROTAX914.glb',
   viewMode,
   onViewModeChange,
   selectedSubsystem,
@@ -207,7 +209,7 @@ export default function UnityDigitalTwinViewport({
     // 2. EngineModelController (Load Model)
     const loader = new GLTFLoader();
     loader.load(
-      '/models/Turbojet.glb',
+      modelUrl,
       (gltf) => {
         const root = gltf.scene;
         

@@ -236,13 +236,83 @@
             font-size: 0.56rem; color: #94a3b8; border-bottom: 1px solid rgba(255,255,255,0.04); padding-bottom: 2px;
         }
         .pd-spec-row strong { color: #f8fafc; font-weight: 600; }
+
+        /* Top Blender Model Navigation Bar */
+        .top-model-nav-bar {
+            position: absolute;
+            top: 14px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 50;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: rgba(6, 11, 24, 0.94);
+            border: 1px solid rgba(56, 189, 248, 0.35);
+            border-radius: 10px;
+            padding: 6px 12px;
+            backdrop-filter: blur(20px);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.85);
+        }
+        .model-nav-btn {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 14px;
+            border-radius: 6px;
+            background: rgba(15, 23, 42, 0.7);
+            border: 1px solid rgba(56, 189, 248, 0.2);
+            color: #94a3b8;
+            font-size: 0.68rem;
+            font-weight: 700;
+            letter-spacing: 0.8px;
+            cursor: pointer;
+            transition: all 0.25s ease;
+            white-space: nowrap;
+            font-family: inherit;
+        }
+        .model-nav-btn:hover {
+            color: #38bdf8;
+            border-color: rgba(56, 189, 248, 0.6);
+            background: rgba(14, 165, 233, 0.15);
+            box-shadow: 0 0 12px rgba(56, 189, 248, 0.25);
+        }
+        .model-nav-btn.active {
+            color: #060b16;
+            background: linear-gradient(135deg, #38bdf8 0%, #0284c7 100%);
+            border-color: #7dd3fc;
+            box-shadow: 0 0 18px rgba(56, 189, 248, 0.5);
+        }
+        .model-badge {
+            font-size: 0.54rem;
+            padding: 2px 5px;
+            border-radius: 4px;
+            font-weight: 800;
+            background: rgba(255, 255, 255, 0.2);
+            color: inherit;
+        }
     </style>
 </head>
 <body>
     <div id="canvas-container"></div>
 
+    <!-- TOP BLENDER MODEL NAVIGATION BAR -->
+    <div class="top-model-nav-bar" id="top-model-nav-bar">
+        <button class="model-nav-btn active" data-model="ROTAX914" onclick="setBlenderModel('ROTAX914')">
+            <span>🚁 ROTAX 914 TURBO</span>
+            <span class="model-badge">115 HP</span>
+        </button>
+        <button class="model-nav-btn" data-model="ROTAX912" onclick="setBlenderModel('ROTAX912')">
+            <span>🛩️ ROTAX 912</span>
+            <span class="model-badge">100 HP</span>
+        </button>
+        <button class="model-nav-btn" data-model="TURBOJET" onclick="setBlenderModel('TURBOJET')">
+            <span>⚡ TURBOJET CORE</span>
+            <span class="model-badge">CAD CORE</span>
+        </button>
+    </div>
+
     <div class="state-hud">
-        <div class="sh-org">IIT INDORE × HAL DIGITAL TWIN</div>
         <div class="sh-title">AEROTWIN Ω</div>
         <div class="sh-label">Engine State</div>
         <div class="sh-value" id="sh-state">COLD ENGINE</div>
@@ -988,22 +1058,159 @@ new THREE.GLTFLoader().load('./Turbojetdemo.glb', (gltf) => {
     outerGrp.visible = false;
 });
 
-E.TwinViewMode = 'INTERNAL';
+// ── ROTAX 914 TURBO-PISTON 3D DIGITAL TWIN MODEL ──
+const rotaxGrp = new THREE.Group(); rotaxGrp.rotation.y = (270 * Math.PI / 180);
+scene.add(rotaxGrp);
 
-function toggleTwinViewMode() {}
+let rotaxMeshes = [], rotaxRotatingParts = [];
+
+new THREE.GLTFLoader().load('./ROTAX914.glb', (gltf) => {
+    const rm = gltf.scene;
+    
+    // Calculate bounding box and scale/center ROTAX 914 model
+    const box = new THREE.Box3().setFromObject(rm);
+    const size = box.getSize(new THREE.Vector3());
+    const maxDim = Math.max(size.x, size.y, size.z);
+    const scaleFactor = maxDim > 0 ? (4.2 / maxDim) : 0.6;
+    
+    rm.scale.set(scaleFactor, scaleFactor, scaleFactor);
+    const center = box.getCenter(new THREE.Vector3());
+    rm.position.sub(center.multiplyScalar(scaleFactor));
+    
+    rotaxGrp.add(rm);
+    scene.updateMatrixWorld(true);
+    
+    rm.traverse((c) => {
+        if (c.isMesh) {
+            c.castShadow = true;
+            c.receiveShadow = true;
+            rotaxMeshes.push(c);
+            initPos.set(c, c.position.clone());
+            allMeshes.push(c);
+            
+            const n = c.name.toLowerCase();
+            if (n.includes('prop') || n.includes('rotor') || n.includes('shaft') || n.includes('crank') || n.includes('flywheel') || n.includes('gear') || n.includes('piston')) {
+                rotaxRotatingParts.push(c);
+            }
+            if (c.material) {
+                if (Array.isArray(c.material)) {
+                    c.material.forEach(m => { m.metalness = 0.65; m.roughness = 0.35; m.needsUpdate = true; });
+                } else {
+                    c.material.metalness = 0.65;
+                    c.material.roughness = 0.35;
+                    c.material.needsUpdate = true;
+                }
+            }
+        }
+    });
+});
+
+// ── ROTAX 912 4-STROKE AERO ENGINE 3D DIGITAL TWIN MODEL ──
+const rotax912Grp = new THREE.Group(); rotax912Grp.rotation.y = (270 * Math.PI / 180);
+scene.add(rotax912Grp);
+
+let rotax912Meshes = [], rotax912RotatingParts = [];
+
+new THREE.GLTFLoader().load('./ROTAX912.glb', (gltf) => {
+    const rm912 = gltf.scene;
+    
+    // Calculate bounding box and scale/center ROTAX 912 model
+    const box = new THREE.Box3().setFromObject(rm912);
+    const size = box.getSize(new THREE.Vector3());
+    const maxDim = Math.max(size.x, size.y, size.z);
+    const scaleFactor = maxDim > 0 ? (4.2 / maxDim) : 0.6;
+    
+    rm912.scale.set(scaleFactor, scaleFactor, scaleFactor);
+    const center = box.getCenter(new THREE.Vector3());
+    rm912.position.sub(center.multiplyScalar(scaleFactor));
+    
+    rotax912Grp.add(rm912);
+    scene.updateMatrixWorld(true);
+    
+    rm912.traverse((c) => {
+        if (c.isMesh) {
+            c.castShadow = true;
+            c.receiveShadow = true;
+            rotax912Meshes.push(c);
+            initPos.set(c, c.position.clone());
+            allMeshes.push(c);
+            
+            const n = c.name.toLowerCase();
+            if (n.includes('prop') || n.includes('rotor') || n.includes('shaft') || n.includes('crank') || n.includes('flywheel') || n.includes('gear') || n.includes('piston')) {
+                rotax912RotatingParts.push(c);
+            }
+            if (c.material) {
+                if (Array.isArray(c.material)) {
+                    c.material.forEach(m => { m.metalness = 0.65; m.roughness = 0.35; m.needsUpdate = true; });
+                } else {
+                    c.material.metalness = 0.65;
+                    c.material.roughness = 0.35;
+                    c.material.needsUpdate = true;
+                }
+            }
+        }
+    });
+    rotax912Grp.visible = false;
+});
+
+E.TwinViewMode = 'ROTAX914';
+
+function setBlenderModel(modelKey, skipAnim) {
+    E.TwinViewMode = modelKey;
+    
+    const flash = document.getElementById('view-transition-flash');
+    const flashText = document.getElementById('transition-flash-text');
+    if (flash && !skipAnim) {
+        if (flashText) {
+            if (modelKey === 'ROTAX914') flashText.innerText = '🚁 LOADING ROTAX 914 TURBO-PISTON MODEL...';
+            else if (modelKey === 'ROTAX912') flashText.innerText = '🛩️ LOADING ROTAX 912 AERO ENGINE MODEL...';
+            else if (modelKey === 'TURBOJET') flashText.innerText = '⚡ LOADING TURBOJET CORE ENGINE MODEL...';
+            else if (modelKey === 'OUTER') flashText.innerText = '🛡️ LOADING NACELLE & CASING MODEL...';
+        }
+        flash.style.opacity = '1';
+        setTimeout(() => { flash.style.opacity = '0'; }, 300);
+    }
+    
+    if (typeof eGrp !== 'undefined') eGrp.visible = (modelKey === 'TURBOJET');
+    if (typeof outerGrp !== 'undefined') outerGrp.visible = (modelKey === 'OUTER');
+    if (typeof rotaxGrp !== 'undefined') rotaxGrp.visible = (modelKey === 'ROTAX914');
+    if (typeof rotax912Grp !== 'undefined') rotax912Grp.visible = (modelKey === 'ROTAX912');
+
+    const shTitle = document.querySelector('.sh-title');
+    const shVal = document.getElementById('sh-state');
+    const shDetail = document.getElementById('sh-detail');
+
+    if (modelKey === 'ROTAX914') {
+        if (shTitle) shTitle.innerText = 'ROTAX 914 TURBO';
+        if (shVal) shVal.innerText = 'ROTAX 914 F ENGINE';
+        if (shDetail) shDetail.innerText = '115 HP · 1211 cc · 4-Stroke Turbocharged Aero Engine';
+    } else if (modelKey === 'ROTAX912') {
+        if (shTitle) shTitle.innerText = 'ROTAX 912 ENGINE';
+        if (shVal) shVal.innerText = 'ROTAX 912 ULS ENGINE';
+        if (shDetail) shDetail.innerText = '100 HP · 1352 cc · 4-Stroke Aero Engine';
+    } else if (modelKey === 'TURBOJET') {
+        if (shTitle) shTitle.innerText = 'AEROTWIN Ω';
+        if (shVal) shVal.innerText = 'HAL TJ4-001 CORE';
+        if (shDetail) shDetail.innerText = 'Dual-Spool Axial Jet Engine · 6-Stage LPC / 8-Stage HPC';
+    }
+
+    document.querySelectorAll('.model-nav-btn').forEach(btn => {
+        if (btn.getAttribute('data-model') === modelKey) {
+            btn.classList.add('active');
+        } else {
+            btn.classList.remove('active');
+        }
+    });
+
+    try {
+        window.parent.postMessage({ type: 'MODEL_CHANGED', modelKey: modelKey }, '*');
+    } catch(e) {}
+}
 
 function setTwinViewMode(mode, skipAnim) {
-    E.TwinViewMode = 'INTERNAL';
-    outerGrp.visible = false;
-    eGrp.visible = true;
-
-    if (typeof flameGrp !== 'undefined') flameGrp.visible = E.FlameOn;
-    if (typeof fuelSpray !== 'undefined') fuelSpray.visible = E.cRPM > 500;
-    if (typeof zones !== 'undefined') {
-        zones.forEach(z => { if (z.ps && z.ps.material) z.ps.material.opacity = E.cRPM > 100 ? 0.45 : 0.0; });
-    }
+    setBlenderModel(mode === 'OUTER' ? 'OUTER' : (mode === 'INTERNAL' ? 'TURBOJET' : mode), skipAnim);
 }
-setTwinViewMode('INTERNAL', true);
+setBlenderModel('ROTAX914', true);
 
 
 
@@ -1860,24 +2067,18 @@ ren.domElement.addEventListener('click', (e) => {
     ms.x = (e.clientX/innerWidth)*2-1; ms.y = -(e.clientY/innerHeight)*2+1;
     rc.setFromCamera(ms, cam);
 
-    if (E.TwinViewMode === 'OUTER') {
-        const hits = rc.intersectObjects(outerGrp.children, true);
-        if (hits.length > 0) {
-            const worldPos = new THREE.Vector3();
-            hits[0].object.getWorldPosition(worldPos);
-            orb.target.lerp(worldPos, 0.6);
-            playInspectPing();
-        }
-        return;
-    }
+    let targetGrp = eGrp;
+    if (E.TwinViewMode === 'OUTER') targetGrp = outerGrp;
+    else if (E.TwinViewMode === 'ROTAX914') targetGrp = rotaxGrp;
+    else if (E.TwinViewMode === 'ROTAX912') targetGrp = rotax912Grp;
 
-    const hits = rc.intersectObjects(eGrp.children, true);
+    const hits = rc.intersectObjects(targetGrp.children, true);
     if (hits.length > 0) {
-        // Pivot camera smoothly onto clicked mesh, but DO NOT show floating popup text!
         const worldPos = new THREE.Vector3();
         hits[0].object.getWorldPosition(worldPos);
         orb.target.lerp(worldPos, 0.6);
         playInspectPing();
+        return;
     }
     const insp = document.getElementById('inspector');
     if (insp) insp.style.display = 'none';
@@ -2117,15 +2318,43 @@ function animate() {
     try {
         const t = clk.getElapsedTime(); fc++; orb.update();
         
-        // Continuous 100% position, rotation, and scale synchronization between outer & inner twin
+        // Continuous position, rotation, and scale synchronization across all twin models
         if (E.TwinViewMode === 'OUTER') {
             eGrp.position.copy(outerGrp.position);
             eGrp.rotation.copy(outerGrp.rotation);
             eGrp.scale.copy(outerGrp.scale);
+            if (typeof rotaxGrp !== 'undefined') { rotaxGrp.position.copy(outerGrp.position); rotaxGrp.rotation.copy(outerGrp.rotation); rotaxGrp.scale.copy(outerGrp.scale); }
+            if (typeof rotax912Grp !== 'undefined') { rotax912Grp.position.copy(outerGrp.position); rotax912Grp.rotation.copy(outerGrp.rotation); rotax912Grp.scale.copy(outerGrp.scale); }
+        } else if (E.TwinViewMode === 'ROTAX914' && typeof rotaxGrp !== 'undefined') {
+            eGrp.position.copy(rotaxGrp.position);
+            eGrp.rotation.copy(rotaxGrp.rotation);
+            eGrp.scale.copy(rotaxGrp.scale);
+            outerGrp.position.copy(rotaxGrp.position);
+            outerGrp.rotation.copy(rotaxGrp.rotation);
+            outerGrp.scale.copy(rotaxGrp.scale);
+            if (typeof rotax912Grp !== 'undefined') { rotax912Grp.position.copy(rotaxGrp.position); rotax912Grp.rotation.copy(rotaxGrp.rotation); rotax912Grp.scale.copy(rotaxGrp.scale); }
+        } else if (E.TwinViewMode === 'ROTAX912' && typeof rotax912Grp !== 'undefined') {
+            eGrp.position.copy(rotax912Grp.position);
+            eGrp.rotation.copy(rotax912Grp.rotation);
+            eGrp.scale.copy(rotax912Grp.scale);
+            outerGrp.position.copy(rotax912Grp.position);
+            outerGrp.rotation.copy(rotax912Grp.rotation);
+            outerGrp.scale.copy(rotax912Grp.scale);
+            if (typeof rotaxGrp !== 'undefined') { rotaxGrp.position.copy(rotax912Grp.position); rotaxGrp.rotation.copy(rotax912Grp.rotation); rotaxGrp.scale.copy(rotax912Grp.scale); }
         } else {
             outerGrp.position.copy(eGrp.position);
             outerGrp.rotation.copy(eGrp.rotation);
             outerGrp.scale.copy(eGrp.scale);
+            if (typeof rotaxGrp !== 'undefined') { rotaxGrp.position.copy(eGrp.position); rotaxGrp.rotation.copy(eGrp.rotation); rotaxGrp.scale.copy(eGrp.scale); }
+            if (typeof rotax912Grp !== 'undefined') { rotax912Grp.position.copy(eGrp.position); rotax912Grp.rotation.copy(eGrp.rotation); rotax912Grp.scale.copy(eGrp.scale); }
+        }
+
+        if (E.TwinViewMode === 'ROTAX914' && typeof rotaxRotatingParts !== 'undefined' && rotaxRotatingParts.length > 0) {
+            const rotSpeed = (E.cRPM / 60) * Math.PI * 2 * 0.016;
+            rotaxRotatingParts.forEach(part => { part.rotation.z += rotSpeed; });
+        } else if (E.TwinViewMode === 'ROTAX912' && typeof rotax912RotatingParts !== 'undefined' && rotax912RotatingParts.length > 0) {
+            const rotSpeed = (E.cRPM / 60) * Math.PI * 2 * 0.016;
+            rotax912RotatingParts.forEach(part => { part.rotation.z += rotSpeed; });
         }
 
         rotateSpool(); zones.forEach(animZone); animFuel(); animFlame(t); animExhaust(t);
