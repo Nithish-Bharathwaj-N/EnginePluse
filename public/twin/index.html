@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AEROTWIN Ω — IIT Indore × HAL Engineering Digital Twin</title>
+    <title>TURBOJET Ω — IIT Indore × HAL Engineering Digital Twin</title>
     <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
@@ -313,7 +313,7 @@
     </div>
 
     <div class="state-hud">
-        <div class="sh-title">AEROTWIN Ω</div>
+        <div class="sh-title">TURBOJET Ω</div>
         <div class="sh-label">Engine State</div>
         <div class="sh-value" id="sh-state">COLD ENGINE</div>
         <div class="sh-sub" id="sh-detail">0 RPM · T3 20°C · Cycle 1</div>
@@ -446,39 +446,16 @@
             <span class="sim-label">DATASET SIMULATION</span>
             <select id="engine-select" class="sim-btn" style="background:rgba(15,23,42,0.9);" onchange="selectEngine(this.value)">
             </select>
-            <button id="btn-sim-play" class="sim-btn" onclick="toggleSimPlayback()">▶ PLAY SIM</button>
-            <input type="range" id="sim-cycle-slider" class="sim-slider" min="1" max="300" value="1" oninput="scrubCycle(this.value)">
-            <span class="sim-val" id="sim-cycle-val">Cycle 1 / 300</span>
         </div>
 
         <!-- ROW 2: ENGINE ACTION CONTROLS & DISPLAY MODES -->
         <div class="dock-row ctrl-row">
             <button class="ctrl-btn start" id="btn-engine-toggle" onclick="toggleEngineState()">▶ START ENGINE</button>
             <button class="ctrl-btn active" id="btn-cutaway" onclick="toggleCutaway()">CUTAWAY</button>
-            <button class="ctrl-btn" id="btn-exploded" onclick="toggleExploded()">EXPLODE</button>
-            <button class="ctrl-btn" id="btn-rotdir" onclick="toggleRotDir()">⇄ ROT: CCW</button>
-            <button class="ctrl-btn" id="btn-heatmap" onclick="cycleHeatmapMode()">MAP: ALLOY</button>
+
             <button class="ctrl-btn" id="btn-audio" onclick="toggleAudio()">🔊 AUDIO</button>
             <button class="ctrl-btn" id="btn-parts" onclick="togglePartsDrawer()">PARTS DIRECTORY</button>
             <button class="ctrl-btn" id="btn-analytics" onclick="toggleAnalytics()">ANALYTICS & HEALTH</button>
-            <select id="scenario-select" class="ctrl-select" onchange="injectFailure(this.value)">
-                <option value="NORMAL">NOMINAL BASELINE</option>
-                <option value="COMPRESSOR_FOULING">COMPRESSOR FOULING</option>
-                <option value="COMPRESSOR_SURGE">COMPRESSOR SURGE</option>
-                <option value="BEARING_WEAR">BEARING WEAR</option>
-                <option value="HIGH_EGT">HIGH EGT</option>
-                <option value="FUEL_INJECTOR_CLOGGING">FUEL INJECTOR CLOG</option>
-                <option value="COMBUSTOR_EFFICIENCY_LOSS">COMBUSTOR LOSS</option>
-                <option value="OIL_PRESSURE_LOSS">OIL PRESSURE LOSS</option>
-                <option value="TURBINE_BLADE_EROSION">TURBINE EROSION</option>
-                <option value="SAND_INGESTION_DESERT">DESERT SAND INGESTION</option>
-                <option value="COLD_WEATHER_ICING">COLD WEATHER ICING</option>
-                <option value="FOREIGN_OBJECT_DAMAGE">FOD INGESTION</option>
-                <option value="TURBINE_CREEP_RUNAWAY">CREEP RUNAWAY</option>
-                <option value="COMBUSTOR_BURN_THROUGH">COMBUSTOR BURN-THROUGH</option>
-                <option value="ROTOR_IMBALANCE_RESONANCE">ROTOR RESONANCE</option>
-                <option value="TBC_COATING_DELAMINATION">TBC DELAMINATION</option>
-            </select>
         </div>
     </div>
 
@@ -586,7 +563,7 @@
 
 <script>
 // =====================================================================
-//  AEROTWIN Ω — 46-COMPONENT PRECISION AEROSPACE DIGITAL TWIN
+//  TURBOJET Ω — 46-COMPONENT PRECISION AEROSPACE DIGITAL TWIN
 // =====================================================================
 
 const E = {
@@ -997,7 +974,7 @@ function animFlame(t) {
 
 function animExhaust(t) {}
 
-let lpRotors = [], hpRotors = [], casings = [], allMeshes = [], sensorLEDs = [];
+let lpRotors = [], hpRotors = [], casings = [], allMeshes = [], turbojetMeshes = [], sensorLEDs = [];
 let initPos = new Map(); let cutaway = false, exploded = false;
 
 new THREE.GLTFLoader().load('./Turbojet.glb', (gltf) => {
@@ -1014,7 +991,7 @@ new THREE.GLTFLoader().load('./Turbojet.glb', (gltf) => {
         c.localToWorld(center);
         c.userData.stageWorldZ = center.z;
 
-        initPos.set(c, c.position.clone()); allMeshes.push(c);
+        initPos.set(c, c.position.clone()); allMeshes.push(c); turbojetMeshes.push(c);
         const n = c.name;
         if (n.includes('Fan_Blade') || n.includes('Fan_Hub') || n.includes('Intake_Cone') || n.includes('LPC_Stage') || n.includes('Low_Pressure_Turbine')) {
             lpRotors.push(c);
@@ -1064,7 +1041,7 @@ scene.add(rotaxGrp);
 
 let rotaxMeshes = [], rotaxRotatingParts = [];
 
-new THREE.GLTFLoader().load('./ROTAX914.glb', (gltf) => {
+new THREE.GLTFLoader().load('./ROTAX914.glb?v=' + Date.now(), (gltf) => {
     const rm = gltf.scene;
     
     // Calculate bounding box and scale/center ROTAX 914 model
@@ -1111,7 +1088,7 @@ scene.add(rotax912Grp);
 
 let rotax912Meshes = [], rotax912RotatingParts = [];
 
-new THREE.GLTFLoader().load('./ROTAX912.glb', (gltf) => {
+new THREE.GLTFLoader().load('./ROTAX912.glb?v=270m_' + Date.now(), (gltf) => {
     const rm912 = gltf.scene;
     
     // Calculate bounding box and scale/center ROTAX 912 model
@@ -1176,6 +1153,18 @@ function setBlenderModel(modelKey, skipAnim) {
     if (typeof rotaxGrp !== 'undefined') rotaxGrp.visible = (modelKey === 'ROTAX914');
     if (typeof rotax912Grp !== 'undefined') rotax912Grp.visible = (modelKey === 'ROTAX912');
 
+    // Toggle bottom simulation control dock and throttle quadrant (only active for TURBOJET)
+    const dockEl = document.querySelector('.control-dock');
+    const throttleEl = document.querySelector('.throttle-quadrant');
+    const isTurbojet = (modelKey === 'TURBOJET');
+
+    if (dockEl) {
+        dockEl.style.display = isTurbojet ? 'flex' : 'none';
+    }
+    if (throttleEl) {
+        throttleEl.style.display = isTurbojet ? 'flex' : 'none';
+    }
+
     const shTitle = document.querySelector('.sh-title');
     const shVal = document.getElementById('sh-state');
     const shDetail = document.getElementById('sh-detail');
@@ -1189,7 +1178,7 @@ function setBlenderModel(modelKey, skipAnim) {
         if (shVal) shVal.innerText = 'ROTAX 912 ULS ENGINE';
         if (shDetail) shDetail.innerText = '100 HP · 1352 cc · 4-Stroke Aero Engine';
     } else if (modelKey === 'TURBOJET') {
-        if (shTitle) shTitle.innerText = 'AEROTWIN Ω';
+        if (shTitle) shTitle.innerText = 'TURBOJET Ω';
         if (shVal) shVal.innerText = 'HAL TJ4-001 CORE';
         if (shDetail) shDetail.innerText = 'Dual-Spool Axial Jet Engine · 6-Stage LPC / 8-Stage HPC';
     }
@@ -1354,7 +1343,7 @@ function updateExplodedStagePositions() {
 
 function updateThermals() {
     updateExplodedStagePositions();
-    allMeshes.forEach(mesh => {
+    turbojetMeshes.forEach(mesh => {
         if (!mesh.material || mesh.name.includes('_LED')) return;
         const info = lookupC(mesh.name); const temp = getCompTemp(mesh.name);
         const col = getHeatmapOverlayColor(mesh); const emi = getThermalEmissive(temp);
@@ -2349,13 +2338,7 @@ function animate() {
             if (typeof rotax912Grp !== 'undefined') { rotax912Grp.position.copy(eGrp.position); rotax912Grp.rotation.copy(eGrp.rotation); rotax912Grp.scale.copy(eGrp.scale); }
         }
 
-        if (E.TwinViewMode === 'ROTAX914' && typeof rotaxRotatingParts !== 'undefined' && rotaxRotatingParts.length > 0) {
-            const rotSpeed = (E.cRPM / 60) * Math.PI * 2 * 0.016;
-            rotaxRotatingParts.forEach(part => { part.rotation.z += rotSpeed; });
-        } else if (E.TwinViewMode === 'ROTAX912' && typeof rotax912RotatingParts !== 'undefined' && rotax912RotatingParts.length > 0) {
-            const rotSpeed = (E.cRPM / 60) * Math.PI * 2 * 0.016;
-            rotax912RotatingParts.forEach(part => { part.rotation.z += rotSpeed; });
-        }
+        // ROTAX 912 and 914 do not have simulation — no rotating parts animation for them
 
         rotateSpool(); zones.forEach(animZone); animFuel(); animFlame(t); animExhaust(t);
         updateIngestionAnimations(t);

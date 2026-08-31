@@ -29,7 +29,7 @@ export const WorkstationPage: React.FC = React.memo(() => {
   const renderActiveView = () => {
     switch (currentView) {
       case 'overview':
-        return <OverviewView />;
+        return <TwinView />;
       case 'fleet':
         return <FleetView />;
       case 'details':
@@ -45,8 +45,6 @@ export const WorkstationPage: React.FC = React.memo(() => {
         return <EngineAnalysisView />;
       case 'ai':
         return <AiDiagnosticsView />;
-      case 'explain':
-        return <ExplainabilityView />;
       case 'physics':
         return <PhysicsView />;
       case 'investigation':
@@ -68,7 +66,7 @@ export const WorkstationPage: React.FC = React.memo(() => {
       case 'settings':
         return <SettingsView />;
       default:
-        return <OverviewView />;
+        return <TwinView />;
     }
   };
 

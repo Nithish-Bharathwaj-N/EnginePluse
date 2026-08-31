@@ -38,7 +38,6 @@ const NAV_GROUPS: NavGroup[] = [
   {
     label: 'Operations',
     items: [
-      { id: 'overview', label: 'Mission Overview', icon: LayoutDashboard },
       { id: 'fleet', label: 'Fleet Operations', icon: Plane, badge: '10 A/C' },
       { id: 'details', label: 'Aircraft Logbook', icon: FileText },
     ],
@@ -58,7 +57,6 @@ const NAV_GROUPS: NavGroup[] = [
     label: 'Intelligence',
     items: [
       { id: 'ai', label: 'AI Diagnostics', icon: BrainCircuit, badge: 'v4' },
-      { id: 'explain', label: 'XAI Explainability', icon: HelpCircle },
       { id: 'investigation', label: 'Root Cause Analysis', icon: Search },
     ],
   },
