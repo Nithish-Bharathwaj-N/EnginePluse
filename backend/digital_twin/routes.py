@@ -7,8 +7,7 @@ from fastapi import APIRouter, HTTPException
 from fastapi.responses import PlainTextResponse, Response
 
 twin_dir = os.path.dirname(os.path.abspath(__file__))
-if twin_dir not in sys.path:
-    sys.path.append(twin_dir)
+sys.path.insert(0, twin_dir)
 
 from engine_state import state_manager
 from ml.health_predictor import HealthPredictor

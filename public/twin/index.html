@@ -298,13 +298,13 @@
 
     <!-- TOP BLENDER MODEL NAVIGATION BAR -->
     <div class="top-model-nav-bar" id="top-model-nav-bar">
-        <button class="model-nav-btn active" data-model="ROTAX914" onclick="setBlenderModel('ROTAX914')">
-            <span>🚁 ROTAX 914 TURBO</span>
-            <span class="model-badge">115 HP</span>
-        </button>
-        <button class="model-nav-btn" data-model="ROTAX912" onclick="setBlenderModel('ROTAX912')">
+        <button class="model-nav-btn active" data-model="ROTAX912" onclick="setBlenderModel('ROTAX912')">
             <span>🛩️ ROTAX 912</span>
             <span class="model-badge">100 HP</span>
+        </button>
+        <button class="model-nav-btn" data-model="ROTAX914" onclick="setBlenderModel('ROTAX914')">
+            <span>🚁 ROTAX 914 TURBO</span>
+            <span class="model-badge">115 HP</span>
         </button>
         <button class="model-nav-btn" data-model="TURBOJET" onclick="setBlenderModel('TURBOJET')">
             <span>⚡ TURBOJET CORE</span>
@@ -455,7 +455,23 @@
 
             <button class="ctrl-btn" id="btn-audio" onclick="toggleAudio()">🔊 AUDIO</button>
             <button class="ctrl-btn" id="btn-parts" onclick="togglePartsDrawer()">PARTS DIRECTORY</button>
-            <button class="ctrl-btn" id="btn-analytics" onclick="toggleAnalytics()">ANALYTICS & HEALTH</button>
+        </div>
+    </div>
+
+    <!-- DEDICATED ROTAX 912 ENHANCED SIMULATION CONTROL DOCK -->
+    <div class="control-dock rotax912-control-dock" id="rotax912-control-dock" style="display: none; border-color: rgba(34, 197, 94, 0.45); background: rgba(6, 12, 20, 0.95);">
+        <!-- ROW 1: ROTAX 912 ACTION CONTROLS -->
+        <div class="dock-row ctrl-row">
+            <button class="ctrl-btn start" id="r912-btn-start" onclick="toggleRotax912Running()">▶ START ROTAX 912</button>
+            <button class="ctrl-btn active" id="r912-btn-audio" onclick="toggleRotax912Audio()">🔊 AUDIO ON</button>
+            <button class="ctrl-btn" id="r912-btn-thermal" onclick="toggleRotax912Thermal()">🌡️ THERMAL MODE</button>
+            <button class="ctrl-btn" onclick="resetRotax912View()">🔄 RESET VIEW</button>
+        </div>
+        <!-- ROW 2: ROTAX 912 THROTTLE QUADRANT -->
+        <div class="dock-row sim-row" style="border-bottom: none; padding-bottom: 0; margin-top: 4px; gap: 12px;">
+            <span class="sim-label" style="color: #4ade80;">ROTAX 912 THROTTLE:</span>
+            <input type="range" id="r912-throttle-slider" class="sim-slider" min="0" max="100" value="0" style="accent-color: #4ade80; width: 180px;" oninput="setRotax912Throttle(this.value)">
+            <span class="sim-val" id="r912-throttle-val" style="color: #4ade80; min-width: 140px;">0% (STOPPED)</span>
         </div>
     </div>
 
@@ -1127,10 +1143,372 @@ new THREE.GLTFLoader().load('./ROTAX912.glb?v=270m_' + Date.now(), (gltf) => {
             }
         }
     });
-    rotax912Grp.visible = false;
+    initRotax912InternalMechanism(rm912);
+    setBlenderModel('ROTAX912', true);
 });
 
-E.TwinViewMode = 'ROTAX914';
+// ─── ROTAX 912 ISOLATED ENHANCED SIMULATION STATE & LOGIC ───────────────────
+const R912 = {
+    Running: false,
+    Throttle: 0,
+    RPM: 0,
+    PropRPM: 0,
+    MaxRPM: 5500,
+    IdleRPM: 900,
+    GearReduction: 2.43,
+    CHT: 22.0,
+    OilTemp: 22.0,
+    OilPressure: 0.0,
+    FuelFlow: 0.0,
+    Manifold: 0.0,
+    Vibration: 0.0,
+    Cutaway: false,
+    Exploded: false,
+    ThermalMode: false,
+    AudioMuted: false,
+    SimTime: 0,
+
+    PropPivot: null,
+    InternalRoot: null,
+    Crankshaft: null,
+    Camshaft: null,
+    ReductionGear: null,
+    OilPump: null,
+    CoolantPump: null,
+    Alternator: null,
+    Pistons: [null, null, null, null],
+    Rods: [null, null, null, null],
+    PistonPins: [null, null, null, null],
+    CylinderSleeves: [null, null, null, null],
+    CylinderHeads: [null, null, null, null],
+    InletValves: [null, null, null, null],
+    ExhaustValves: [null, null, null, null],
+    InletRockers: [null, null, null, null],
+    ExhaustRockers: [null, null, null, null],
+    PistonBases: [
+        new THREE.Vector3(-0.225,  0.135, 0.0), new THREE.Vector3(-0.015,  0.135, 0.0),
+        new THREE.Vector3(-0.225, -0.135, 0.0), new THREE.Vector3(-0.015, -0.135, 0.0)
+    ],
+    CrankPins: [
+        new THREE.Vector3(-0.225,  0.045, 0.0), new THREE.Vector3(-0.015,  0.045, 0.0),
+        new THREE.Vector3(-0.225, -0.045, 0.0), new THREE.Vector3(-0.015, -0.045, 0.0)
+    ],
+    InletValveBases: [],
+    ExhaustValveBases: [],
+
+    AudioCtx: null,
+    MasterGain: null,
+    EngineOsc: null,
+    EngineGain: null,
+    PropOsc: null,
+    PropGain: null
+};
+
+function initRotax912Audio() {
+    if (!R912.AudioCtx) {
+        try {
+            const AudioCtxClass = window.AudioContext || window.webkitAudioContext;
+            if (!AudioCtxClass) return;
+            R912.AudioCtx = new AudioCtxClass();
+
+            R912.MasterGain = R912.AudioCtx.createGain();
+            R912.MasterGain.gain.value = R912.AudioMuted ? 0 : 0.65;
+            R912.MasterGain.connect(R912.AudioCtx.destination);
+
+            R912.EngineOsc = R912.AudioCtx.createOscillator();
+            R912.EngineOsc.type = 'sawtooth';
+            R912.EngineOsc.frequency.value = 92;
+            R912.EngineGain = R912.AudioCtx.createGain();
+            R912.EngineGain.gain.value = 0;
+            R912.EngineOsc.connect(R912.EngineGain);
+            R912.EngineGain.connect(R912.MasterGain);
+            R912.EngineOsc.start();
+
+            R912.PropOsc = R912.AudioCtx.createOscillator();
+            R912.PropOsc.type = 'sine';
+            R912.PropOsc.frequency.value = 55;
+            R912.PropGain = R912.AudioCtx.createGain();
+            R912.PropGain.gain.value = 0;
+            R912.PropOsc.connect(R912.PropGain);
+            R912.PropGain.connect(R912.MasterGain);
+            R912.PropOsc.start();
+        } catch(e) { console.warn("Rotax 912 WebAudio synth warning:", e); }
+    }
+    if (R912.AudioCtx && R912.AudioCtx.state === 'suspended') {
+        R912.AudioCtx.resume();
+    }
+}
+
+function updateRotax912Audio() {
+    if (!R912.AudioCtx) return;
+    if (R912.AudioCtx.state === 'suspended' && R912.Running && !R912.AudioMuted) {
+        R912.AudioCtx.resume();
+    }
+    const targetMaster = (R912.AudioMuted || !R912.Running || R912.RPM < 50) ? 0 : 0.65;
+    R912.MasterGain.gain.setTargetAtTime(targetMaster, R912.AudioCtx.currentTime, 0.05);
+
+    if (R912.Running && R912.RPM >= 50) {
+        const n = Math.min(1, Math.max(0, R912.RPM / R912.MaxRPM));
+        const engFreq = 65 + n * 240;
+        const propFreq = 35 + (R912.PropRPM / 2500) * 110;
+        R912.EngineOsc.frequency.setTargetAtTime(engFreq, R912.AudioCtx.currentTime, 0.05);
+        R912.PropOsc.frequency.setTargetAtTime(propFreq, R912.AudioCtx.currentTime, 0.05);
+
+        const engVol = 0.08 + n * 0.45;
+        const propVol = 0.03 + n * 0.25;
+        R912.EngineGain.gain.setTargetAtTime(engVol, R912.AudioCtx.currentTime, 0.05);
+        R912.PropGain.gain.setTargetAtTime(propVol, R912.AudioCtx.currentTime, 0.05);
+    }
+}
+
+function createCylinderPrimitive(name, pos, radius, length, rotEuler, parent, color) {
+    const geo = new THREE.CylinderGeometry(radius, radius, length, 16);
+    const mat = new THREE.MeshStandardMaterial({ color: color, metalness: 0.8, roughness: 0.35 });
+    const mesh = new THREE.Mesh(geo, mat);
+    mesh.name = name;
+    mesh.position.copy(pos);
+    mesh.rotation.copy(rotEuler);
+    mesh.castShadow = true; mesh.receiveShadow = true;
+    parent.add(mesh);
+    return mesh;
+}
+
+function initRotax912InternalMechanism(rm912) {
+    const propNames = [
+        "propeller_backplate", "propeller_blade_1", "propeller_blade_2", "propeller_blade_3",
+        "propeller_bolt_1", "propeller_bolt_2", "propeller_bolt_3", "propeller_bolt_4",
+        "propeller_bolt_5", "propeller_bolt_6", "propeller_spinner", "propeller_hub", "propeller"
+    ];
+
+    const pivotGO = new THREE.Group();
+    pivotGO.name = "PROP_ROTATION_PIVOT_912";
+    pivotGO.position.set(0.1125, 0.110502, 0.045893);
+    rm912.add(pivotGO);
+    R912.PropPivot = pivotGO;
+
+    const reparentList = [];
+    rm912.traverse((c) => {
+        if (c.isMesh) {
+            const nl = c.name.toLowerCase();
+            if (propNames.some(p => nl.includes(p))) {
+                reparentList.push(c);
+            }
+        }
+    });
+
+    reparentList.forEach((mesh) => {
+        pivotGO.attach(mesh);
+    });
+
+    const internalRoot = new THREE.Group();
+    internalRoot.name = "SIMULATED_INTERNAL_MECHANISM_912";
+    rm912.add(internalRoot);
+    R912.InternalRoot = internalRoot;
+
+    const Aluminum = new THREE.Color(0x9ea7b0);
+    const DarkSteel = new THREE.Color(0x1a1f24);
+    const Steel = new THREE.Color(0x525961);
+    const Brass = new THREE.Color(0x8c6b33);
+
+    R912.Crankshaft = createCylinderPrimitive("Crankshaft_SIM", new THREE.Vector3(-0.16, 0, 0), 0.018, 0.42, new THREE.Euler(0, 0, Math.PI/2), internalRoot, Steel);
+    R912.Camshaft = createCylinderPrimitive("Camshaft_SIM", new THREE.Vector3(-0.08, 0, 0.075), 0.009, 0.34, new THREE.Euler(0, 0, Math.PI/2), internalRoot, DarkSteel);
+    R912.ReductionGear = createCylinderPrimitive("ReductionGear_SIM", new THREE.Vector3(0.07, 0, 0.01), 0.075, 0.022, new THREE.Euler(0, Math.PI/2, 0), internalRoot, Steel);
+    R912.OilPump = createCylinderPrimitive("OilPump_SIM", new THREE.Vector3(0.03, -0.045, -0.045), 0.015, 0.026, new THREE.Euler(0, Math.PI/2, 0), internalRoot, DarkSteel);
+    R912.CoolantPump = createCylinderPrimitive("CoolantPump_SIM", new THREE.Vector3(-0.01, 0.055, -0.045), 0.014, 0.025, new THREE.Euler(0, Math.PI/2, 0), internalRoot, Aluminum);
+    R912.Alternator = createCylinderPrimitive("Alternator_SIM", new THREE.Vector3(-0.28, 0, 0.07), 0.023, 0.045, new THREE.Euler(0, Math.PI/2, 0), internalRoot, Aluminum);
+
+    for (let i = 0; i < 4; i++) {
+        const bank = i < 2 ? 1.0 : -1.0;
+        const x = R912.PistonBases[i].x;
+
+        R912.CylinderSleeves[i] = createCylinderPrimitive("CylinderSleeve_" + (i + 1) + "_SIM", new THREE.Vector3(x, bank * 0.17, 0), 0.043, 0.15, new THREE.Euler(0, 0, 0), internalRoot, DarkSteel);
+        R912.CylinderHeads[i] = createCylinderPrimitive("CylinderHead_" + (i + 1) + "_SIM", new THREE.Vector3(x, bank * 0.255, 0), 0.052, 0.055, new THREE.Euler(0, 0, 0), internalRoot, Aluminum);
+
+        R912.Pistons[i] = createCylinderPrimitive("Piston_" + (i + 1) + "_SIM", R912.PistonBases[i].clone(), 0.032, 0.038, new THREE.Euler(0, 0, 0), internalRoot, Aluminum);
+        R912.PistonPins[i] = createCylinderPrimitive("PistonPin_" + (i + 1) + "_SIM", R912.PistonBases[i].clone(), 0.006, 0.055, new THREE.Euler(0, 0, Math.PI/2), internalRoot, Steel);
+        R912.Rods[i] = createCylinderPrimitive("ConnectingRod_" + (i + 1) + "_SIM", R912.PistonBases[i].clone(), 0.008, 0.11, new THREE.Euler(0, 0, 0), internalRoot, Steel);
+
+        const valveCenter = new THREE.Vector3(x, bank * 0.292, 0);
+        const inValBase = valveCenter.clone().add(new THREE.Vector3(-0.018, 0, 0));
+        const exValBase = valveCenter.clone().add(new THREE.Vector3(0.018, 0, 0));
+        R912.InletValveBases.push(inValBase);
+        R912.ExhaustValveBases.push(exValBase);
+
+        R912.InletValves[i] = createCylinderPrimitive("InletValve_" + (i + 1) + "_SIM", inValBase, 0.0045, 0.035, new THREE.Euler(0, 0, 0), internalRoot, Steel);
+        R912.ExhaustValves[i] = createCylinderPrimitive("ExhaustValve_" + (i + 1) + "_SIM", exValBase, 0.0045, 0.035, new THREE.Euler(0, 0, 0), internalRoot, Brass);
+
+        R912.InletRockers[i] = createCylinderPrimitive("InletRocker_" + (i + 1) + "_SIM", valveCenter.clone().add(new THREE.Vector3(-0.018, 0.02, 0.015)), 0.006, 0.045, new THREE.Euler(Math.PI/2, 0, 0), internalRoot, Steel);
+        R912.ExhaustRockers[i] = createCylinderPrimitive("ExhaustRocker_" + (i + 1) + "_SIM", valveCenter.clone().add(new THREE.Vector3(0.018, 0.02, 0.015)), 0.006, 0.045, new THREE.Euler(Math.PI/2, 0, 0), internalRoot, Steel);
+    }
+
+    internalRoot.visible = false;
+}
+
+function updateRotax912Simulation(dt, time) {
+    if (E.TwinViewMode !== 'ROTAX912') return;
+
+    R912.SimTime += dt;
+    const targetRPM = R912.Running ? (R912.IdleRPM + (R912.MaxRPM - R912.IdleRPM) * (R912.Throttle / 100)) : 0;
+    R912.RPM += (targetRPM - R912.RPM) * Math.min(1.0, (R912.Running ? 2.5 : 4.0) * dt);
+    if (!R912.Running && R912.RPM < 5) R912.RPM = 0;
+    R912.PropRPM = R912.RPM / R912.GearReduction;
+
+    const crankOmega = R912.RPM * Math.PI * 2 / 60;
+    const phase = R912.SimTime * crankOmega;
+    const propOmega = crankOmega / R912.GearReduction;
+
+    if (R912.PropPivot) {
+        R912.PropPivot.rotateX(propOmega * dt);
+    }
+
+    if (R912.Crankshaft) R912.Crankshaft.rotation.y = phase;
+    if (R912.Camshaft) R912.Camshaft.rotation.y = phase * 0.5;
+    if (R912.ReductionGear) R912.ReductionGear.rotation.y = phase * 0.5;
+    if (R912.OilPump) R912.OilPump.rotation.y = phase;
+    if (R912.CoolantPump) R912.CoolantPump.rotation.y = phase;
+    if (R912.Alternator) R912.Alternator.rotation.y = phase;
+
+    if (R912.Pistons[0]) {
+        for (let i = 0; i < 4; i++) {
+            const bankSign = i < 2 ? 1.0 : -1.0;
+            const phaseOffset = (i === 1 || i === 2) ? Math.PI : 0;
+            const theta = phase + phaseOffset;
+            const stroke = 0.052 * Math.cos(theta);
+
+            const p = R912.PistonBases[i].clone().add(new THREE.Vector3(0, bankSign * stroke, 0));
+            R912.Pistons[i].position.copy(p);
+            R912.PistonPins[i].position.copy(p);
+
+            const crankPin = R912.CrankPins[i].clone().add(new THREE.Vector3(0, 0.038 * Math.sin(theta), 0));
+            const rodDir = p.clone().sub(crankPin);
+            const rodLen = Math.max(0.001, rodDir.length());
+            R912.Rods[i].position.copy(crankPin.clone().add(p).multiplyScalar(0.5));
+            R912.Rods[i].quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), rodDir.clone().normalize());
+            R912.Rods[i].scale.set(0.016, rodLen * 0.5, 0.016);
+
+            const valveLift = 0.009 * Math.max(0, Math.sin(theta * 2));
+            R912.InletValves[i].position.copy(R912.InletValveBases[i].clone().add(new THREE.Vector3(0, valveLift, 0)));
+            R912.ExhaustValves[i].position.copy(R912.ExhaustValveBases[i].clone().add(new THREE.Vector3(0, 0.009 * Math.max(0, Math.sin(theta * 2 + 1.2)), 0)));
+
+            R912.InletRockers[i].rotation.z = Math.sin(theta * 2) * 0.14;
+            R912.ExhaustRockers[i].rotation.z = Math.sin(theta * 2 + 1.2) * 0.14;
+        }
+    }
+
+    const n = Math.min(1, Math.max(0, R912.RPM / R912.MaxRPM));
+    const load = R912.Throttle / 100;
+    R912.CHT += (22.0 + 93.0 * (n * 0.75 + load * 0.25) - R912.CHT) * Math.min(1.0, 1.2 * dt);
+    R912.OilTemp += (22.0 + 83.0 * (n * 0.65 + load * 0.35) - R912.OilTemp) * Math.min(1.0, 1.0 * dt);
+    R912.OilPressure = R912.Running ? (1.0 + 4.5 * n) : 0;
+    R912.FuelFlow = R912.Running ? (1.8 + 25.2 * load) : 0;
+    R912.Manifold = R912.Running ? (18.0 + 18.0 * load) : 0;
+    R912.Vibration = R912.Running ? (0.08 + n * 0.75) : 0;
+
+    if (rotax912Meshes.length > 0) {
+        rotax912Meshes.forEach(mesh => {
+            if (!mesh.material) return;
+            const mat = Array.isArray(mesh.material) ? mesh.material[0] : mesh.material;
+            if (R912.ThermalMode) {
+                const heatRatio = Math.min(1, Math.max(0, (R912.CHT - 22) / 93));
+                const col = new THREE.Color().setHSL(0.65 - heatRatio * 0.65, 0.95, 0.5);
+                mat.emissive = col;
+                mat.emissiveIntensity = 0.45 + heatRatio * 0.35;
+            } else {
+                mat.emissive = new THREE.Color(0x000000);
+                mat.emissiveIntensity = 0;
+            }
+        });
+    }
+
+    if (rotax912Grp) {
+        rotax912Grp.position.set(0, 0, 0);
+    }
+
+    updateRotax912Audio();
+    updateRotax912HUD();
+}
+
+function updateRotax912HUD() {
+    const shTitle = document.querySelector('.sh-title');
+    const shVal = document.getElementById('sh-state');
+    const shDetail = document.getElementById('sh-detail');
+    const shPhys = document.getElementById('sh-physics');
+
+    if (E.TwinViewMode === 'ROTAX912') {
+        if (shTitle) shTitle.innerText = 'ROTAX 912 ULS DIGITAL TWIN';
+        if (shVal) {
+            shVal.innerText = R912.Running ? 'STATUS: ENGINE RUNNING' : 'STATUS: ENGINE STOPPED';
+            shVal.style.color = R912.Running ? '#4ade80' : '#f87171';
+        }
+        if (shDetail) shDetail.innerText = `RPM: ${Math.round(R912.RPM)} | PROP: ${Math.round(R912.PropRPM)} RPM | THROTTLE: ${Math.round(R912.Throttle)}%`;
+        if (shPhys) shPhys.innerHTML = `CHT: ${R912.CHT.toFixed(1)}°C | OIL TEMP: ${R912.OilTemp.toFixed(1)}°C | PRESS: ${R912.OilPressure.toFixed(2)} bar | FLOW: ${R912.FuelFlow.toFixed(1)} L/h`;
+    }
+
+    const tVal = document.getElementById('r912-throttle-val');
+    if (tVal) {
+        tVal.innerText = `${Math.round(R912.Throttle)}% (${R912.Running ? Math.round(R912.RPM) + ' RPM' : 'STOPPED'})`;
+    }
+}
+
+function toggleRotax912Running() {
+    R912.Running = !R912.Running;
+    const btn = document.getElementById('r912-btn-start');
+    if (btn) {
+        btn.innerText = R912.Running ? '⏹ STOP ROTAX 912' : '▶ START ROTAX 912';
+        btn.className = R912.Running ? 'ctrl-btn stop' : 'ctrl-btn start';
+    }
+    initRotax912Audio();
+    if (R912.AudioCtx && R912.AudioCtx.state === 'suspended') {
+        R912.AudioCtx.resume();
+    }
+}
+
+function toggleRotax912Audio() {
+    R912.AudioMuted = !R912.AudioMuted;
+    const btn = document.getElementById('r912-btn-audio');
+    if (btn) {
+        btn.innerText = R912.AudioMuted ? '🔇 AUDIO OFF' : '🔊 AUDIO ON';
+        btn.classList.toggle('active', !R912.AudioMuted);
+    }
+    initRotax912Audio();
+    if (R912.AudioCtx && R912.AudioCtx.state === 'suspended') {
+        R912.AudioCtx.resume();
+    }
+}
+
+function toggleRotax912Thermal() {
+    R912.ThermalMode = !R912.ThermalMode;
+    const btn = document.getElementById('r912-btn-thermal');
+    if (btn) {
+        btn.classList.toggle('active', R912.ThermalMode);
+    }
+}
+
+function toggleRotax912Cutaway() {
+    R912.Cutaway = !R912.Cutaway;
+    const btn = document.getElementById('r912-btn-cutaway');
+    if (btn) btn.classList.toggle('active', R912.Cutaway);
+    if (R912.InternalRoot) R912.InternalRoot.visible = R912.Cutaway;
+}
+
+function toggleRotax912Exploded() {
+    R912.Exploded = !R912.Exploded;
+    const btn = document.getElementById('r912-btn-exploded');
+    if (btn) btn.classList.toggle('active', R912.Exploded);
+    if (R912.InternalRoot) {
+        R912.InternalRoot.position.z = R912.Exploded ? 0.08 : 0;
+    }
+}
+
+function resetRotax912View() {
+    if (rotax912Grp) rotax912Grp.position.set(0, 0, 0);
+}
+
+function setRotax912Throttle(val) {
+    R912.Throttle = parseFloat(val);
+}
+
+E.TwinViewMode = 'ROTAX912';
 
 function setBlenderModel(modelKey, skipAnim) {
     E.TwinViewMode = modelKey;
@@ -1153,16 +1531,21 @@ function setBlenderModel(modelKey, skipAnim) {
     if (typeof rotaxGrp !== 'undefined') rotaxGrp.visible = (modelKey === 'ROTAX914');
     if (typeof rotax912Grp !== 'undefined') rotax912Grp.visible = (modelKey === 'ROTAX912');
 
-    // Toggle bottom simulation control dock and throttle quadrant (only active for TURBOJET)
-    const dockEl = document.querySelector('.control-dock');
+    // Toggle bottom simulation control docks and throttle quadrant
+    const dockEl = document.querySelector('.control-dock:not(.rotax912-control-dock)');
+    const r912DockEl = document.getElementById('rotax912-control-dock');
     const throttleEl = document.querySelector('.throttle-quadrant');
     const isTurbojet = (modelKey === 'TURBOJET');
+    const isRotax912 = (modelKey === 'ROTAX912');
 
     if (dockEl) {
         dockEl.style.display = isTurbojet ? 'flex' : 'none';
     }
     if (throttleEl) {
         throttleEl.style.display = isTurbojet ? 'flex' : 'none';
+    }
+    if (r912DockEl) {
+        r912DockEl.style.display = isRotax912 ? 'flex' : 'none';
     }
 
     const shTitle = document.querySelector('.sh-title');
@@ -2305,6 +2688,7 @@ const clk = new THREE.Clock(); let fc = 0;
 function animate() {
     requestAnimationFrame(animate);
     try {
+        const dt = Math.min(clk.getDelta(), 0.05);
         const t = clk.getElapsedTime(); fc++; orb.update();
         
         // Continuous position, rotation, and scale synchronization across all twin models
@@ -2338,13 +2722,16 @@ function animate() {
             if (typeof rotax912Grp !== 'undefined') { rotax912Grp.position.copy(eGrp.position); rotax912Grp.rotation.copy(eGrp.rotation); rotax912Grp.scale.copy(eGrp.scale); }
         }
 
-        // ROTAX 912 and 914 do not have simulation — no rotating parts animation for them
-
-        rotateSpool(); zones.forEach(animZone); animFuel(); animFlame(t); animExhaust(t);
-        updateIngestionAnimations(t);
-        if (fc % 4 === 0) updateThermals(); applyVibration(t);
-        updateAudio();
-        updateHUD(); ren.render(scene, cam);
+        if (E.TwinViewMode === 'ROTAX912') {
+            updateRotax912Simulation(dt, t);
+        } else {
+            rotateSpool(); zones.forEach(animZone); animFuel(); animFlame(t); animExhaust(t);
+            updateIngestionAnimations(t);
+            if (fc % 4 === 0) updateThermals(); applyVibration(t);
+            updateAudio();
+            updateHUD();
+        }
+        ren.render(scene, cam);
     } catch(err) {
         console.error("Render loop error:", err);
     }

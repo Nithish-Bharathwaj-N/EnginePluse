@@ -6,8 +6,9 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
 
-# Ensure parent directory is in Python path for imports
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, base_dir)
+sys.path.insert(0, os.path.join(base_dir, "backend", "digital_twin"))
 
 from backend.auth.models import Base, engine, SessionLocal, Operator
 from backend.auth.password_service import hash_password
