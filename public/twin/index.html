@@ -1102,9 +1102,11 @@ new THREE.GLTFLoader().load('./ROTAX914.glb?v=' + Date.now(), (gltf) => {
 const rotax912Grp = new THREE.Group(); rotax912Grp.rotation.y = (270 * Math.PI / 180);
 scene.add(rotax912Grp);
 
-let rotax912Meshes = [], rotax912RotatingParts = [];
+const localR912Url = './ROTAX912.glb?v=270m_' + Date.now();
+const remoteR912Url = 'https://media.githubusercontent.com/media/Nithish-Bharathwaj-N/EnginePluse/main/public/twin/ROTAX912.glb';
+const r912LoadUrl = (location.hostname === 'localhost' || location.hostname === '127.0.0.1') ? localR912Url : remoteR912Url;
 
-new THREE.GLTFLoader().load('./ROTAX912.glb?v=270m_' + Date.now(), (gltf) => {
+new THREE.GLTFLoader().load(r912LoadUrl, (gltf) => {
     const rm912 = gltf.scene;
     
     // Calculate bounding box and scale/center ROTAX 912 model
